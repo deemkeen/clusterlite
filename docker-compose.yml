@@ -1,0 +1,29 @@
+services:
+  clusterlite1:
+    build:
+      context: .
+    image: clusterlite
+    volumes:
+      - ./db.sqlite:/data/db.sqlite
+      - ./db.sqlite-shm:/data/db.sqlite-shm
+      - ./db.sqlite-wal:/data/db.sqlite-wal
+  clusterlite2:
+    build:
+      context: .
+    image: clusterlite
+    volumes:
+      - ./db.sqlite:/data/db.sqlite
+      - ./db.sqlite-shm:/data/db.sqlite-shm
+      - ./db.sqlite-wal:/data/db.sqlite-wal
+  clusterlite3:
+    build:
+      context: .
+    image: clusterlite
+    volumes:
+      - ./db.sqlite:/data/db.sqlite
+      - ./db.sqlite-shm:/data/db.sqlite-shm
+      - ./db.sqlite-wal:/data/db.sqlite-wal
+networks:
+  default:
+    external:
+      name: vputest
