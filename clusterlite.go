@@ -67,7 +67,7 @@ func NewDatabase(dbPath string, kafkaBrokers []string) (*Database, error) {
 	}
 
 	// Enable WAL mode
-	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
+	if _, err := db.Exec("PRAGMA journal_mode=WAL; PRAGMA SYNCHRONOUS=NORMAL;"); err != nil {
 		return nil, err
 	}
 
@@ -210,7 +210,7 @@ func NewDatabaseConsumer(dbPath string, kafkaBrokers []string, groupID string) (
 	}
 
 	// Enable WAL mode
-	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
+	if _, err := db.Exec("PRAGMA journal_mode=WAL; PRAGMA SYNCHRONOUS=NORMAL;"); err != nil {
 		return nil, err
 	}
 
@@ -426,8 +426,9 @@ func (s *Server) handleGetAllUsers(w http.ResponseWriter, r *http.Request) {
 func main() {
 	ctx := context.Background()
 	kafkaBrokers := []string{"kafka:8092", "kafka2:8092"}
+	dbPath := "./db/db.sqlite"
 
-	db, err := NewDatabase("./db.sqlite", kafkaBrokers)
+	db, err := NewDatabase(dbPath, kafkaBrokers)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -443,7 +444,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	consumer, err := NewDatabaseConsumer("./db.sqlite", kafkaBrokers, "db-consumer-group")
+	consumer, err := NewDatabaseConsumer(dbPath, kafkaBrokers, "db-consumer-group")
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -4,25 +4,19 @@ services:
       context: .
     image: clusterlite
     volumes:
-      - ./db.sqlite:/data/db.sqlite
-      - ./db.sqlite-shm:/data/db.sqlite-shm
-      - ./db.sqlite-wal:/data/db.sqlite-wal
+      - ./db:/data/db
   clusterlite2:
     build:
       context: .
     image: clusterlite
     volumes:
-      - ./db.sqlite:/data/db.sqlite
-      - ./db.sqlite-shm:/data/db.sqlite-shm
-      - ./db.sqlite-wal:/data/db.sqlite-wal
+      - ./db:/data/db
   clusterlite3:
     build:
       context: .
     image: clusterlite
     volumes:
-      - ./db.sqlite:/data/db.sqlite
-      - ./db.sqlite-shm:/data/db.sqlite-shm
-      - ./db.sqlite-wal:/data/db.sqlite-wal
+      - ./db:/data/db
 networks:
   default:
     external:
