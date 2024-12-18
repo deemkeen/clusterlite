@@ -1,127 +1,137 @@
 # ClusterLite
 
-ClusterLite is a distributed SQLite database system that uses Apache Kafka (via RedPanda) for event synchronization across multiple nodes. It provides a simple HTTP API for managing user data while maintaining consistency across all nodes in the cluster.
+ClusterLite is a distributed SQLite database system that implements event sourcing using RedPanda (Kafka-compatible) for synchronization across multiple nodes. It provides a generic HTTP API for managing entities while maintaining eventual consistency across all nodes in the cluster.
 
 ## Features
 
-- Distributed SQLite database with event-driven synchronization
-- REST API for CRUD operations
-- Event sourcing using Kafka/RedPanda
-- Load balancing with Nginx
+- Generic entity management system with table operation abstractions
+- Event-sourced architecture using RedPanda/Kafka
+- Multi-node SQLite database synchronization
+- RESTful API with CORS support
+- Horizontal scalability with Nginx load balancing
+- WAL (Write-Ahead Logging) enabled SQLite
 - Docker-based deployment
-- Horizontal scalability
-- CORS support
-- WAL (Write-Ahead Logging) enabled for better concurrency
+- Sample User entity implementation
+- Web-based UI for user management
 
 ## Architecture
 
-The system consists of the following components:
+The system consists of:
 
 - Multiple ClusterLite nodes running SQLite databases
-- RedPanda (Kafka-compatible message broker) for event distribution
-- Nginx load balancer for distributing requests
+- RedPanda message broker for event distribution
+- Nginx load balancer
 - Shared volume for SQLite database files
-- Event-driven consistency model
+- Generic entity registry and operation handlers
+
+### Components
+
+- `lib/clusterlite.go`: Core functionality including entity registry, event handling, and HTTP routing
+- `models/user.go`: Sample User entity implementation
+- `main.go`: Application entry point and configuration
+- `index.html`: Web-based management interface
 
 ## Prerequisites
 
 - Docker and Docker Compose
 - Go 1.23.3 or later (for development)
-- A Docker network named "vputest"
+- Docker network named "vputest"
 
 ## Quick Start
 
-1. Create the required Docker network:
+1. Create required Docker network:
 ```bash
 docker network create vputest
 ```
 
 2. Build and start the cluster:
 ```bash
+chmod +x build.sh
+./build.sh
 docker-compose up --build
 ```
 
-The service will be available at `http://localhost:80`
+3. Access the web interface at `http://localhost`
 
 ## API Endpoints
 
+Generic entity endpoints:
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/users` | Create a new user |
-| GET | `/users` | Get all users |
-| GET | `/users/{id}` | Get a specific user |
-| PUT | `/users/{id}` | Update a user |
-| DELETE | `/users/{id}` | Delete a user |
+| POST | `/{table}` | Create entity |
+| GET | `/{table}` | List entities |
+| GET | `/{table}/{id}` | Get entity |
+| PUT | `/{table}/{id}` | Update entity |
+| DELETE | `/{table}/{id}` | Delete entity |
 
-### Example Requests
+### Example User Operations
 
-Create a user:
+Create user:
 ```bash
 curl -X POST http://localhost/users \
   -H "Content-Type: application/json" \
   -d '{"name": "John Doe", "email": "john@example.com"}'
 ```
 
-Get all users:
+List users:
 ```bash
 curl http://localhost/users
 ```
 
-## Configuration
+## Implementation Details
 
-The system can be configured through the following files:
+### Entity Operations Interface
 
-- `docker-compose.yml`: Container configuration
-- `nginx.conf`: Load balancer settings
-- Environment variables in the Docker Compose file
+Entities must implement the `TableOperations` interface:
+
+```go
+type TableOperations interface {
+    HandleUpsert(ctx context.Context, tx *sql.Tx, event DatabaseEvent) error
+    HandleDelete(ctx context.Context, tx *sql.Tx, event DatabaseEvent) error
+    Get(ctx context.Context, id string) (map[string]any, error)
+    GetAll(ctx context.Context) ([]map[string]any, error)
+    CreateEvent(data interface{}) (*DatabaseEvent, error)
+    UpdateEvent(id string, data interface{}) (*DatabaseEvent, error)
+    DeleteEvent(id string) (*DatabaseEvent, error)
+    GetTableName() string
+    CreateTable(ctx context.Context) error
+}
+```
+
+### Event Structure
+
+```go
+type DatabaseEvent struct {
+    ID        string
+    Operation string
+    TableName string
+    Data      map[string]any
+    Timestamp time.Time
+}
+```
 
 ## Development
 
-To build the project locally:
+Adding a new entity type:
 
-```bash
-go build -o clusterlite
-```
-
-## Project Structure
-
-```
-.
-├── clusterlite.go      # Main application code
-├── Dockerfile          # Docker build instructions
-├── docker-compose.yml  # Container orchestration
-├── go.mod             # Go dependencies
-├── go.sum             # Go dependencies checksums
-├── nginx.conf         # Nginx configuration
-└── README.md          # This file
-```
-
-## How It Works
-
-1. Each write operation (CREATE/UPDATE/DELETE) generates an event
-2. Events are published to RedPanda (Kafka)
-3. All nodes consume events and apply them to their local SQLite database
-4. Read operations are served directly from the local SQLite database
-5. Nginx distributes incoming requests across all nodes
+1. Create a new model file in `models/`
+2. Implement the `TableOperations` interface
+3. Register the entity in `main.go`
 
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+3. Implement changes
+4. Submit a Pull Request
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT License
 
 ## Acknowledgments
 
-- RedPanda for providing a Kafka-compatible message broker
-- SQLite for the embedded database
-- The Go community for excellent libraries and tools
-
-## Disclaimer
-
-This project is meant for educational purposes and may need additional hardening for production use.
+- RedPanda for Kafka-compatible message broker
+- SQLite for embedded database
+- Go community for excellent libraries
