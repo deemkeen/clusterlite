@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -54,7 +55,7 @@ func createTopic(brokers []string) error {
 	}
 
 	err = admin.CreateTopic("db_events", topicDetail, false)
-	if err != nil && err != sarama.ErrTopicAlreadyExists {
+	if err != nil && !strings.Contains(err.Error(), sarama.ErrTopicAlreadyExists.Error()) {
 		return err
 	}
 	return nil
@@ -425,7 +426,7 @@ func (s *Server) handleGetAllUsers(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	ctx := context.Background()
-	kafkaBrokers := []string{"kafka:8092", "kafka2:8092"}
+	kafkaBrokers := []string{"redpanda:9092"}
 	dbPath := "./db/db.sqlite"
 
 	db, err := NewDatabase(dbPath, kafkaBrokers)
