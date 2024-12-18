@@ -1,4 +1,4 @@
-package main
+package lib
 
 import (
 	"context"
@@ -12,18 +12,14 @@ import (
 	"time"
 
 	"github.com/IBM/sarama"
-	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 const (
-	DB_PATH        = "./db/db.sqlite"
 	PRAGMAS        = "PRAGMA journal_mode=WAL; PRAGMA SYNCHRONOUS=NORMAL;"
-	KAFKA_URL      = "redpanda:9092"
 	TOPIC          = "db_events"
 	CONSUMER_GROUP = "db-consumer-group"
-	HTTP_PORT      = ":8082"
 )
 
 type Entity interface {
@@ -77,9 +73,9 @@ type DatabaseEvent struct {
 }
 
 type Database struct {
-	db       *sql.DB
+	Db       *sql.DB
 	producer sarama.SyncProducer
-	registry *EntityRegistry
+	Registry *EntityRegistry
 }
 
 func createTopic(brokers []string) error {
@@ -139,9 +135,9 @@ func NewDatabase(dbPath string, kafkaBrokers []string) (*Database, error) {
 	}
 
 	database := &Database{
-		db:       db,
+		Db:       db,
 		producer: producer,
-		registry: NewEntityRegistry(db, producer),
+		Registry: NewEntityRegistry(db, producer),
 	}
 
 	return database, nil
@@ -161,193 +157,8 @@ func (d *Database) PublishEvent(event DatabaseEvent) error {
 	return err
 }
 
-// User Definition
-type User struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
-}
-
-func (u User) GetTableName() string {
-	return "users"
-}
-
-func (u User) Validate() error {
-	if u.Name == "" || u.Email == "" {
-		return fmt.Errorf("name and email are required")
-	}
-	return nil
-}
-
-type UserOperations struct {
-	db *sql.DB
-}
-
-// Declaraction of implentation of TableOperations type
-var _ TableOperations = (*UserOperations)(nil)
-
-func NewUserOperations(db *sql.DB) *UserOperations {
-	return &UserOperations{db: db}
-}
-
-func (uo *UserOperations) GetTableName() string {
-	return "users"
-}
-
-func (uo *UserOperations) CreateTable(ctx context.Context) error {
-	_, err := uo.db.ExecContext(ctx, `
-		CREATE TABLE IF NOT EXISTS users (
-			id TEXT PRIMARY KEY,
-			name TEXT NOT NULL,
-			email TEXT NOT NULL
-		)
-	`)
-	return err
-}
-
-func (uo *UserOperations) HandleUpsert(ctx context.Context, tx *sql.Tx, event DatabaseEvent) error {
-	_, err := tx.ExecContext(ctx,
-		`INSERT INTO users (id, name, email)
-		VALUES (?, ?, ?)
-		ON CONFLICT(id) DO UPDATE SET
-		name = excluded.name,
-		email = excluded.email`,
-		event.Data["id"],
-		event.Data["name"],
-		event.Data["email"],
-	)
-	return err
-}
-
-func (uo *UserOperations) HandleDelete(ctx context.Context, tx *sql.Tx, event DatabaseEvent) error {
-	_, err := tx.ExecContext(ctx,
-		"DELETE FROM users WHERE id = ?",
-		event.Data["id"],
-	)
-	return err
-}
-
-func (uo *UserOperations) CreateEvent(data interface{}) (*DatabaseEvent, error) {
-	var input struct {
-		Name  string `json:"name"`
-		Email string `json:"email"`
-	}
-
-	bytes, err := json.Marshal(data)
-	if err != nil {
-		return nil, fmt.Errorf("invalid input data format")
-	}
-
-	if err := json.Unmarshal(bytes, &input); err != nil {
-		return nil, fmt.Errorf("invalid input data format")
-	}
-
-	if input.Name == "" || input.Email == "" {
-		return nil, fmt.Errorf("name and email are required")
-	}
-
-	return &DatabaseEvent{
-		ID:        uuid.New().String(),
-		Operation: "INSERT",
-		TableName: "users",
-		Data: map[string]any{
-			"id":    uuid.New().String(),
-			"name":  input.Name,
-			"email": input.Email,
-		},
-		Timestamp: time.Now(),
-	}, nil
-}
-
-func (uo *UserOperations) UpdateEvent(id string, data interface{}) (*DatabaseEvent, error) {
-	var input struct {
-		Name  string `json:"name"`
-		Email string `json:"email"`
-	}
-
-	bytes, err := json.Marshal(data)
-	if err != nil {
-		return nil, fmt.Errorf("invalid input data format")
-	}
-
-	if err := json.Unmarshal(bytes, &input); err != nil {
-		return nil, fmt.Errorf("invalid input data format")
-	}
-
-	if input.Name == "" || input.Email == "" {
-		return nil, fmt.Errorf("name and email are required")
-	}
-
-	return &DatabaseEvent{
-		ID:        uuid.New().String(),
-		Operation: "UPDATE",
-		TableName: "users",
-		Data: map[string]any{
-			"id":    id,
-			"name":  input.Name,
-			"email": input.Email,
-		},
-		Timestamp: time.Now(),
-	}, nil
-}
-
-func (uo *UserOperations) DeleteEvent(id string) (*DatabaseEvent, error) {
-	return &DatabaseEvent{
-		ID:        uuid.New().String(),
-		Operation: "DELETE",
-		TableName: "users",
-		Data: map[string]any{
-			"id": id,
-		},
-		Timestamp: time.Now(),
-	}, nil
-}
-
-func (uo *UserOperations) Get(ctx context.Context, id string) (map[string]any, error) {
-	var name, email string
-	err := uo.db.QueryRowContext(ctx,
-		"SELECT name, email FROM users WHERE id = ?",
-		id,
-	).Scan(&name, &email)
-
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	return map[string]any{
-		"id":    id,
-		"name":  name,
-		"email": email,
-	}, nil
-}
-
-func (uo *UserOperations) GetAll(ctx context.Context) ([]map[string]any, error) {
-	rows, err := uo.db.QueryContext(ctx, "SELECT id, name, email FROM users")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var users []map[string]any
-	for rows.Next() {
-		var id, name, email string
-		if err := rows.Scan(&id, &name, &email); err != nil {
-			return nil, err
-		}
-		users = append(users, map[string]any{
-			"id":    id,
-			"name":  name,
-			"email": email,
-		})
-	}
-	return users, nil
-}
-
 type DatabaseConsumer struct {
-	registry      *EntityRegistry
+	Registry      *EntityRegistry
 	consumerGroup sarama.ConsumerGroup
 	groupID       string
 }
@@ -364,7 +175,7 @@ func NewDatabaseConsumer(dbPath string, kafkaBrokers []string, groupID string, r
 	}
 
 	return &DatabaseConsumer{
-		registry:      registry,
+		Registry:      registry,
 		consumerGroup: group,
 		groupID:       groupID,
 	}, nil
@@ -431,7 +242,7 @@ func (h *ConsumerGroupHandler) processEvent(ctx context.Context, event DatabaseE
 
 func (dc *DatabaseConsumer) Start(ctx context.Context) error {
 	topics := []string{TOPIC}
-	handler := &ConsumerGroupHandler{registry: dc.registry}
+	handler := &ConsumerGroupHandler{registry: dc.Registry}
 
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
@@ -640,32 +451,9 @@ func enableCORS(handler http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func main() {
-	ctx := context.Background()
-	kafkaBrokers := []string{KAFKA_URL}
-
-	db, err := NewDatabase(DB_PATH, kafkaBrokers)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if err := db.registry.Register(NewUserOperations(db.db)); err != nil {
-		log.Fatal(err)
-	}
-
-	consumer, err := NewDatabaseConsumer(DB_PATH, kafkaBrokers, CONSUMER_GROUP, db.registry)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	go func() {
-		if err := consumer.Start(ctx); err != nil {
-			log.Printf("Consumer error: %v", err)
-		}
-	}()
-
+func StartRouter(registry *EntityRegistry) *mux.Router {
 	router := mux.NewRouter()
-	entityHandler := NewEntityHandler(db.registry)
+	entityHandler := NewEntityHandler(registry)
 
 	router.HandleFunc("/{table}", enableCORS(entityHandler.HandleCreate)).Methods("POST", "OPTIONS")
 	router.HandleFunc("/{table}", enableCORS(entityHandler.HandleGetAll)).Methods("GET", "OPTIONS")
@@ -673,8 +461,5 @@ func main() {
 	router.HandleFunc("/{table}/{id}", enableCORS(entityHandler.HandleDelete)).Methods("DELETE", "OPTIONS")
 	router.HandleFunc("/{table}/{id}", enableCORS(entityHandler.HandleGet)).Methods("GET", "OPTIONS")
 
-	log.Printf("Starting HTTP server on %s", HTTP_PORT)
-	if err := http.ListenAndServe(HTTP_PORT, router); err != nil {
-		log.Fatal(err)
-	}
+	return router
 }
