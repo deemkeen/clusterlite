@@ -343,6 +343,21 @@ type Server struct {
 	db *Database
 }
 
+func enableCORS(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "*")
+
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		next(w, r)
+	}
+}
+
 func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Name  string `json:"name"`
@@ -459,11 +474,11 @@ func main() {
 	server := &Server{db: db}
 	router := mux.NewRouter()
 
-	router.HandleFunc("/users", server.handleCreateUser).Methods("POST")
-	router.HandleFunc("/users", server.handleGetAllUsers).Methods("GET")
-	router.HandleFunc("/users/{id}", server.handleUpdateUser).Methods("PUT")
-	router.HandleFunc("/users/{id}", server.handleDeleteUser).Methods("DELETE")
-	router.HandleFunc("/users/{id}", server.handleGetUser).Methods("GET")
+	router.HandleFunc("/users", enableCORS(server.handleCreateUser)).Methods("POST", "OPTIONS")
+	router.HandleFunc("/users", enableCORS(server.handleGetAllUsers)).Methods("GET", "OPTIONS")
+	router.HandleFunc("/users/{id}", enableCORS(server.handleUpdateUser)).Methods("PUT", "OPTIONS")
+	router.HandleFunc("/users/{id}", enableCORS(server.handleDeleteUser)).Methods("DELETE", "OPTIONS")
+	router.HandleFunc("/users/{id}", enableCORS(server.handleGetUser)).Methods("GET", "OPTIONS")
 
 	log.Printf("Starting HTTP server on :8082")
 	if err := http.ListenAndServe(":8082", router); err != nil {
