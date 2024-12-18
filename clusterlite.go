@@ -16,6 +16,15 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+const (
+	DB_PATH        = "./db/db.sqlite"
+	PRAGMAS        = "PRAGMA journal_mode=WAL; PRAGMA SYNCHRONOUS=NORMAL;"
+	KAFKA_URL      = "redpanda:9092"
+	TOPIC          = "db_events"
+	CONSUMER_GROUP = "db-consumer-group"
+	HTTP_PORT      = ":8082"
+)
+
 // DatabaseEvent represents a database modification event
 type DatabaseEvent struct {
 	ID        string         `json:"id"`
@@ -45,7 +54,7 @@ func createTopic(brokers []string) error {
 		return err
 	}
 
-	if _, exists := topics["db_events"]; exists {
+	if _, exists := topics[TOPIC]; exists {
 		return nil
 	}
 
@@ -54,7 +63,7 @@ func createTopic(brokers []string) error {
 		ReplicationFactor: 1,
 	}
 
-	err = admin.CreateTopic("db_events", topicDetail, false)
+	err = admin.CreateTopic(TOPIC, topicDetail, false)
 	if err != nil && !strings.Contains(err.Error(), sarama.ErrTopicAlreadyExists.Error()) {
 		return err
 	}
@@ -68,7 +77,7 @@ func NewDatabase(dbPath string, kafkaBrokers []string) (*Database, error) {
 	}
 
 	// Enable WAL mode
-	if _, err := db.Exec("PRAGMA journal_mode=WAL; PRAGMA SYNCHRONOUS=NORMAL;"); err != nil {
+	if _, err := db.Exec(PRAGMAS); err != nil {
 		return nil, err
 	}
 
@@ -101,7 +110,7 @@ func (d *Database) PublishEvent(event DatabaseEvent) error {
 	}
 
 	_, _, err = d.producer.SendMessage(&sarama.ProducerMessage{
-		Topic: "db_events",
+		Topic: TOPIC,
 		Key:   sarama.StringEncoder(event.TableName),
 		Value: sarama.ByteEncoder(data),
 	})
@@ -211,7 +220,7 @@ func NewDatabaseConsumer(dbPath string, kafkaBrokers []string, groupID string) (
 	}
 
 	// Enable WAL mode
-	if _, err := db.Exec("PRAGMA journal_mode=WAL; PRAGMA SYNCHRONOUS=NORMAL;"); err != nil {
+	if _, err := db.Exec(PRAGMAS); err != nil {
 		return nil, err
 	}
 
@@ -316,7 +325,7 @@ func (h *ConsumerGroupHandler) handleDelete(ctx context.Context, tx *sql.Tx, eve
 }
 
 func (dc *DatabaseConsumer) Start(ctx context.Context) error {
-	topics := []string{"db_events"}
+	topics := []string{TOPIC}
 	handler := &ConsumerGroupHandler{db: dc.db}
 
 	wg := &sync.WaitGroup{}
@@ -441,10 +450,9 @@ func (s *Server) handleGetAllUsers(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	ctx := context.Background()
-	kafkaBrokers := []string{"redpanda:9092"}
-	dbPath := "./db/db.sqlite"
+	kafkaBrokers := []string{KAFKA_URL}
 
-	db, err := NewDatabase(dbPath, kafkaBrokers)
+	db, err := NewDatabase(DB_PATH, kafkaBrokers)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -460,7 +468,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	consumer, err := NewDatabaseConsumer(dbPath, kafkaBrokers, "db-consumer-group")
+	consumer, err := NewDatabaseConsumer(DB_PATH, kafkaBrokers, CONSUMER_GROUP)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -480,8 +488,8 @@ func main() {
 	router.HandleFunc("/users/{id}", enableCORS(server.handleDeleteUser)).Methods("DELETE", "OPTIONS")
 	router.HandleFunc("/users/{id}", enableCORS(server.handleGetUser)).Methods("GET", "OPTIONS")
 
-	log.Printf("Starting HTTP server on :8082")
-	if err := http.ListenAndServe(":8082", router); err != nil {
+	log.Printf("Starting HTTP server on %s", HTTP_PORT)
+	if err := http.ListenAndServe(HTTP_PORT, router); err != nil {
 		log.Fatal(err)
 	}
 }
