@@ -189,6 +189,7 @@
                 e.target.reset();
                 isEditing = false;
                 loadUsers();
+                document.querySelector('input[name="name"]').focus();
             };
 
             function editUser(userId, name, email) {
@@ -204,6 +205,7 @@
                 const form = document.getElementById("user-form");
                 form.querySelector('input[name="name"]').value = name;
                 form.querySelector('input[name="email"]').value = email;
+                document.querySelector('input[name="name"]').focus();
             }
 
             async function deleteUser(userId) {
@@ -224,10 +226,12 @@
                     "Create User";
                 document.getElementById("cancel-btn").classList.add("hidden");
                 document.getElementById("user-form").reset();
+                document.querySelector('input[name="name"]').focus();
             }
 
             // Initial load
             loadUsers();
+            document.querySelector('input[name="name"]').focus();
             // Refresh every 2s
             setInterval(loadUsers, 2000);
         </script>
