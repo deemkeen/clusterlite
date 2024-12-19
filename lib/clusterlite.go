@@ -17,7 +17,13 @@ import (
 )
 
 const (
-	PRAGMAS        = "PRAGMA journal_mode=WAL; PRAGMA SYNCHRONOUS=NORMAL;"
+	PRAGMAS = `
+    PRAGMA journal_mode=WAL;
+    PRAGMA synchronous=NORMAL;
+    PRAGMA busy_timeout=5000;           -- Important for concurrent access
+    PRAGMA cache_size=-2000;            -- Use 2MB of memory for cache
+    PRAGMA mmap_size=268435456;         -- Memory-mapped I/O (256MB)
+    `
 	TOPIC          = "db_events"
 	CONSUMER_GROUP = "db-consumer-group"
 )
