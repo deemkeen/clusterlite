@@ -1,6 +1,7 @@
 # ClusterLite
 
-ClusterLite is a distributed SQLite database system that implements event sourcing using RedPanda (Kafka-compatible) for synchronization across multiple nodes. It provides a generic HTTP API for managing entities while maintaining eventual consistency across all nodes in the cluster.
+ClusterLite is a distributed SQLite database system that implements event sourcing using RedPanda (Kafka-compatible) for synchronization across multiple nodes.
+It provides a generic HTTP API for managing entities while maintaining eventual consistency across all nodes in the cluster.
 
 ## Features
 
@@ -12,7 +13,7 @@ ClusterLite is a distributed SQLite database system that implements event sourci
 - WAL (Write-Ahead Logging) enabled SQLite
 - Docker-based deployment
 - Sample User entity implementation
-- Web-based UI for user management
+- Web-based UI for the User entity
 
 ## Architecture
 
@@ -35,7 +36,6 @@ The system consists of:
 
 - Docker and Docker Compose
 - Go 1.23.3 or later (for development)
-- Docker network named "vputest"
 
 ## Quick Start
 

@@ -32,6 +32,7 @@ type UserOperations struct {
 	db *sql.DB
 }
 
+// Make sure the interface is implemented correctly
 var _ cl.TableOperations = (*UserOperations)(nil)
 
 func NewUserOperations(db *sql.DB) *UserOperations {

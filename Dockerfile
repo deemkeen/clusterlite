@@ -1,8 +1,5 @@
 FROM scratch
 
-# Create a volume for data persistence
-#VOLUME ["/data"]
-
 WORKDIR /data
 
 # Copy the static binary
