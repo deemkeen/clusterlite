@@ -39,19 +39,14 @@ The system consists of:
 
 ## Quick Start
 
-1. Create required Docker network:
-```bash
-docker network create vputest
-```
-
-2. Build and start the cluster:
+1. Build and start the cluster:
 ```bash
 chmod +x build.sh
 ./build.sh
 docker-compose up --build
 ```
 
-3. Access the web interface, by opening the index.html in your browser
+2. Access the web interface, by opening the index.html in your browser
 
 ## API Endpoints
 
