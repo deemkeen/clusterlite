@@ -51,7 +51,7 @@ chmod +x build.sh
 docker-compose up --build
 ```
 
-3. Access the web interface at `http://localhost`
+3. Access the web interface, by opening the index.html in your browser
 
 ## API Endpoints
 
@@ -69,14 +69,14 @@ Generic entity endpoints:
 
 Create user:
 ```bash
-curl -X POST http://localhost/users \
+curl -X POST http://localhost:8082/users \
   -H "Content-Type: application/json" \
   -d '{"name": "John Doe", "email": "john@example.com"}'
 ```
 
 List users:
 ```bash
-curl http://localhost/users
+curl http://localhost:8082/users
 ```
 
 ## Implementation Details

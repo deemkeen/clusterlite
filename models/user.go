@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -159,7 +160,7 @@ func (uo *UserOperations) Get(ctx context.Context, id string) (map[string]any, e
 		id,
 	).Scan(&name, &email)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -178,7 +179,12 @@ func (uo *UserOperations) GetAll(ctx context.Context) ([]map[string]any, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+	}(rows)
 
 	var users []map[string]any
 	for rows.Next() {

@@ -91,7 +91,12 @@ func createTopic(brokers []string) error {
 	if err != nil {
 		return err
 	}
-	defer admin.Close()
+	defer func(admin sarama.ClusterAdmin) {
+		err := admin.Close()
+		if err != nil {
+			fmt.Println("Error closing cluster admin:", err)
+		}
+	}(admin)
 
 	topics, err := admin.ListTopics()
 	if err != nil {
@@ -136,7 +141,10 @@ func NewDatabase(dbPath string, kafkaBrokers []string) (*Database, error) {
 
 	producer, err := sarama.NewSyncProducer(kafkaBrokers, config)
 	if err != nil {
-		db.Close()
+		err := db.Close()
+		if err != nil {
+			return nil, err
+		}
 		return nil, err
 	}
 
@@ -169,13 +177,13 @@ type DatabaseConsumer struct {
 	groupID       string
 }
 
-func NewDatabaseConsumer(dbPath string, kafkaBrokers []string, groupID string, registry *EntityRegistry) (*DatabaseConsumer, error) {
+func NewDatabaseConsumer(kafkaBrokers []string, registry *EntityRegistry) (*DatabaseConsumer, error) {
 	config := sarama.NewConfig()
 	config.Consumer.Group.Rebalance.Strategy = sarama.NewBalanceStrategyRoundRobin()
 	config.Consumer.Offsets.Initial = sarama.OffsetOldest
 	config.Version = sarama.V2_0_0_0
 
-	group, err := sarama.NewConsumerGroup(kafkaBrokers, groupID, config)
+	group, err := sarama.NewConsumerGroup(kafkaBrokers, CONSUMER_GROUP, config)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +191,6 @@ func NewDatabaseConsumer(dbPath string, kafkaBrokers []string, groupID string, r
 	return &DatabaseConsumer{
 		Registry:      registry,
 		consumerGroup: group,
-		groupID:       groupID,
 	}, nil
 }
 
@@ -230,7 +237,12 @@ func (h *ConsumerGroupHandler) processEvent(ctx context.Context, event DatabaseE
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func(tx *sql.Tx) {
+		err := tx.Rollback()
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+	}(tx)
 
 	switch event.Operation {
 	case "INSERT", "UPDATE":
@@ -439,7 +451,10 @@ func (h *EntityHandler) HandleGetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(entities)
+	err = json.NewEncoder(w).Encode(entities)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
 }
 
 func enableCORS(handler http.HandlerFunc) http.HandlerFunc {

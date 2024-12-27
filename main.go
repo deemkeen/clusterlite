@@ -36,7 +36,7 @@ func main() {
 
 	//TODO: Register other tables using the same principle
 
-	consumer, err := cl.NewDatabaseConsumer(dbPath, kafkaBrokers, cl.CONSUMER_GROUP, db.Registry)
+	consumer, err := cl.NewDatabaseConsumer(kafkaBrokers, db.Registry)
 	if err != nil {
 		log.Fatal(err)
 	}
